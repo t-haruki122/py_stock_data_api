@@ -68,60 +68,63 @@ async def get_history(
 
     キャッシュTTL: 1日
     """
-    # キャッシュキーとして日付範囲を使用
-    cutoff = datetime.utcnow() - timedelta(seconds=settings.cache_ttl_history)
+    # 日次データ(1d)のみDBキャッシュを利用する
+    if interval == "1d":
+        # キャッシュキーとして日付範囲を使用
+        cutoff = datetime.utcnow() - timedelta(seconds=settings.cache_ttl_history)
 
-    # キャッシュされたデータがあるか確認
-    stmt = (
-        select(StockPrice)
-        .where(StockPrice.symbol == symbol.upper())
-        .where(StockPrice.cached_at >= cutoff)
-        .where(StockPrice.open.isnot(None))  # historyデータはopenがある
-        .order_by(StockPrice.timestamp.asc())
-    )
+        # キャッシュされたデータがあるか確認
+        stmt = (
+            select(StockPrice)
+            .where(StockPrice.symbol == symbol.upper())
+            .where(StockPrice.cached_at >= cutoff)
+            .where(StockPrice.open.isnot(None))  # historyデータはopenがある
+            .order_by(StockPrice.timestamp.asc())
+        )
 
-    if start_date:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        stmt = stmt.where(StockPrice.timestamp >= start_dt)
-    if end_date:
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-        stmt = stmt.where(StockPrice.timestamp <= end_dt)
+        if start_date:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            stmt = stmt.where(StockPrice.timestamp >= start_dt)
+        if end_date:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            stmt = stmt.where(StockPrice.timestamp <= end_dt)
 
-    result = await db.execute(stmt)
-    cached_records = result.scalars().all()
+        result = await db.execute(stmt)
+        cached_records = result.scalars().all()
 
-    if cached_records:
-        stats.log_cache_hit()
-        history = [
-            {
-                "date": r.timestamp.strftime("%Y-%m-%d"),
-                "open": r.open,
-                "high": r.high,
-                "low": r.low,
-                "close": r.close,
-                "volume": r.volume,
-            }
-            for r in cached_records
-        ]
-        return {"symbol": symbol.upper(), "history": history}
+        if cached_records:
+            stats.log_cache_hit()
+            history = [
+                {
+                    "date": r.timestamp.strftime("%Y-%m-%d"),
+                    "open": r.open,
+                    "high": r.high,
+                    "low": r.low,
+                    "close": r.close,
+                    "volume": r.volume,
+                }
+                for r in cached_records
+            ]
+            return {"symbol": symbol.upper(), "history": history}
 
     # 外部APIから取得
     stats.log_api_call()
     records = _client.get_history(symbol, start_date, end_date, interval)
 
-    # キャッシュに保存
-    for rec in records:
-        db_record = StockPrice(
-            symbol=symbol.upper(),
-            timestamp=datetime.strptime(rec["date"], "%Y-%m-%d"),
-            open=rec.get("open"),
-            high=rec.get("high"),
-            low=rec.get("low"),
-            close=rec["close"],
-            volume=rec.get("volume"),
-            cached_at=datetime.utcnow(),
-        )
-        db.add(db_record)
-    await db.commit()
+    # 取得したデータをDBにキャッシュする（日次データのみ）
+    if interval == "1d":
+        for rec in records:
+            db_record = StockPrice(
+                symbol=symbol.upper(),
+                timestamp=datetime.strptime(rec["date"], "%Y-%m-%d"),
+                open=rec.get("open"),
+                high=rec.get("high"),
+                low=rec.get("low"),
+                close=rec["close"],
+                volume=rec.get("volume"),
+                cached_at=datetime.utcnow(),
+            )
+            db.add(db_record)
+        await db.commit()
 
     return {"symbol": symbol.upper(), "history": records}

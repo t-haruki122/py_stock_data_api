@@ -308,11 +308,18 @@ async function loadChart(symbol, period) {
     const p = periodMap[period] || periodMap['3mo'];
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - p.months);
+    
+    let interval = '1d';
+    if (period === '10y') {
+        startDate.setFullYear(startDate.getFullYear() - 10);
+        interval = '1mo'; // 10年は月次
+    } else {
+        startDate.setMonth(startDate.getMonth() - p.months);
+        interval = p.months > 12 ? '1wk' : '1d';
+    }
 
     const startStr = startDate.toISOString().split('T')[0];
     const endStr = endDate.toISOString().split('T')[0];
-    const interval = p.months > 12 ? '1wk' : '1d';
 
     try {
         const data = await fetchAPI(`/stock/${symbol}/history?start_date=${startStr}&end_date=${endStr}&interval=${interval}`);
