@@ -1644,3 +1644,63 @@ footer {
         margin: var(--space-md);
     }
 }
+
+/* ==========================================
+   Stats Bar (System Statistics)
+========================================== */
+.stats-bar {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(30, 41, 59, 0.85); /* 半透明なスレート */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-pill);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.stats-bar:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: var(--primary-light);
+}
+
+.stats-bar.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+}
+
+.stats-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.stats-icon {
+    font-size: 1rem;
+}
+
+.stats-item.highlight span {
+    color: var(--success);
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .stats-bar {
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        justify-content: center;
+        border-radius: var(--border-radius-md);
+    }
+}

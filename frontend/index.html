@@ -12,6 +12,19 @@
     <link rel="stylesheet" href="/static/index.css">
 </head>
 <body>
+    <!-- 統計ステータスバー -->
+    <div id="stats-bar" class="stats-bar hidden">
+        <div class="stats-item" title="外部APIから取得した回数">
+            <span class="stats-icon">📡</span> API: <span id="stat-api-calls">0</span>
+        </div>
+        <div class="stats-item" title="データベース（キャッシュ）から取得した回数">
+            <span class="stats-icon">⚡</span> キャッシュ: <span id="stat-cache-hits">0</span>
+        </div>
+        <div class="stats-item highlight" title="全体のリクエストに対するキャッシュの割合">
+            利用率: <span id="stat-hit-rate">0%</span>
+        </div>
+    </div>
+
     <!-- ヘッダー -->
     <header id="app-header">
         <div class="header-left">

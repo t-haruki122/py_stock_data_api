@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.clients.yfinance_client import YFinanceClient
 from app.models.db_models import StockPrice
 from app.config import get_settings
+from app.stats import stats
 
 settings = get_settings()
 _client = YFinanceClient()
@@ -31,6 +32,7 @@ async def get_current_price(symbol: str, db: AsyncSession) -> dict:
     cached = result.scalar_one_or_none()
 
     if cached:
+        stats.log_cache_hit()
         return {
             "symbol": cached.symbol,
             "price": cached.close,
@@ -38,6 +40,7 @@ async def get_current_price(symbol: str, db: AsyncSession) -> dict:
         }
 
     # 外部APIから取得
+    stats.log_api_call()
     data = _client.get_current_price(symbol)
 
     # キャッシュに保存
@@ -88,6 +91,7 @@ async def get_history(
     cached_records = result.scalars().all()
 
     if cached_records:
+        stats.log_cache_hit()
         history = [
             {
                 "date": r.timestamp.strftime("%Y-%m-%d"),
@@ -102,6 +106,7 @@ async def get_history(
         return {"symbol": symbol.upper(), "history": history}
 
     # 外部APIから取得
+    stats.log_api_call()
     records = _client.get_history(symbol, start_date, end_date, interval)
 
     # キャッシュに保存

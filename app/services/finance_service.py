@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.clients.yfinance_client import YFinanceClient
 from app.models.db_models import Financial
 from app.config import get_settings
+from app.stats import stats
 
 settings = get_settings()
 _client = YFinanceClient()
@@ -31,6 +32,7 @@ async def get_financials(symbol: str, db: AsyncSession) -> dict:
     cached = result.scalar_one_or_none()
 
     if cached:
+        stats.log_cache_hit()
         return {
             "symbol": cached.symbol,
             "revenue": cached.revenue,
@@ -40,6 +42,7 @@ async def get_financials(symbol: str, db: AsyncSession) -> dict:
         }
 
     # 外部APIから取得
+    stats.log_api_call()
     data = _client.get_financials(symbol)
 
     # キャッシュに保存

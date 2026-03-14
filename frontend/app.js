@@ -35,6 +35,10 @@ let tagEditSymbol = null;
             loadDefaultList();
         } catch { /* ignore */ }
     }
+    
+    // 統計情報の定期取得を開始
+    fetchStats();
+    setInterval(fetchStats, 5000);
 })();
 
 // ===== View Switch =====
@@ -79,7 +83,28 @@ async function fetchAPI(endpoint, options = {}) {
     if (!options.method || options.method === 'GET') {
         cache.set(cacheKey, { data, timestamp: Date.now() });
     }
+    fetchStats(); // リクエスト後に統計を更新
     return data;
+}
+
+// ===== System Stats =====
+async function fetchStats() {
+    try {
+        const res = await fetch(`${API_BASE}/stats`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        document.getElementById('stat-api-calls').textContent = data.api_calls;
+        document.getElementById('stat-cache-hits').textContent = data.cache_hits;
+        document.getElementById('stat-hit-rate').textContent = data.hit_rate_percent.toFixed(1) + '%';
+        
+        const bar = document.getElementById('stats-bar');
+        if (data.total_requests > 0) {
+            bar.classList.remove('hidden');
+        }
+    } catch {
+        // ignore errors for stats fetching
+    }
 }
 
 // ===== Search =====

@@ -8,6 +8,7 @@ from app.clients.news_client import NewsClient
 from app.clients.yfinance_client import YFinanceClient
 from app.models.db_models import News
 from app.config import get_settings
+from app.stats import stats
 
 settings = get_settings()
 _news_client = NewsClient()
@@ -32,6 +33,7 @@ async def get_news(symbol: str, db: AsyncSession) -> dict:
     cached_records = result.scalars().all()
 
     if cached_records:
+        stats.log_cache_hit()
         news_list = [
             {
                 "title": r.title,
@@ -52,6 +54,7 @@ async def get_news(symbol: str, db: AsyncSession) -> dict:
         pass
 
     # 外部APIから取得
+    stats.log_api_call()
     articles = _news_client.get_news(symbol, company_name)
 
     # キャッシュに保存
