@@ -27,6 +27,7 @@ class Base(DeclarativeBase):
 
 async def init_db():
     """データベース初期化（テーブル作成）"""
+    import app.models.db_models  # モデルをインポートしないとテーブルが作成されない
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

@@ -18,6 +18,7 @@ env/
 
 # Database
 *.db
+*.db-journal
 
 # IDE
 .vscode/

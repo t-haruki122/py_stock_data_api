@@ -201,7 +201,7 @@ class YFinanceClient:
                 "pbr": round(pbr, 2) if pbr is not None else None,
                 "per": round(per, 2) if per is not None else None,
                 "eps": round(eps, 2) if eps is not None else None,
-                "dividend_yield": round(dividend_yield * 100, 2) if dividend_yield is not None else None,
+                "dividend_yield": round(dividend_yield, 2) if dividend_yield is not None else None,
                 "mix_index": mix_index,
                 "profit_margin": round(profit_margin * 100, 2) if profit_margin is not None else None,
                 "debt_to_equity": round(debt_to_equity, 2) if debt_to_equity is not None else None,
