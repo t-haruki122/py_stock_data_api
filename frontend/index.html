@@ -29,8 +29,99 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
                 リスト比較
             </button>
+            <!-- アカウントボタン -->
+            <div class="account-section">
+                <button class="nav-btn account-btn" id="account-btn" onclick="toggleAccountMenu()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span id="account-btn-label">ログイン</span>
+                </button>
+                <!-- アカウントメニュー -->
+                <div class="account-menu hidden" id="account-menu">
+                    <div class="account-menu-user hidden" id="account-menu-user">
+                        <div class="account-menu-username" id="account-menu-username"></div>
+                        <button class="account-menu-item danger" onclick="logoutUser()">ログアウト</button>
+                    </div>
+                    <div class="account-menu-guest" id="account-menu-guest">
+                        <button class="account-menu-item" onclick="openAuthModal('login')">ログイン</button>
+                        <button class="account-menu-item" onclick="openAuthModal('register')">新規登録</button>
+                    </div>
+                </div>
+            </div>
         </nav>
     </header>
+
+    <!-- ログイン/登録モーダル -->
+    <div class="modal-overlay hidden" id="auth-modal-overlay" onclick="closeAuthModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="auth-modal-title">ログイン</h3>
+                <button class="modal-close" onclick="closeAuthModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="auth-username">ユーザー名</label>
+                    <input type="text" id="auth-username" placeholder="ユーザー名を入力" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">パスワード</label>
+                    <input type="password" id="auth-password" placeholder="パスワードを入力" autocomplete="current-password">
+                </div>
+                <div class="auth-error hidden" id="auth-error"></div>
+                <button class="btn-primary" id="auth-submit-btn" onclick="submitAuth()">ログイン</button>
+                <div class="auth-toggle">
+                    <span id="auth-toggle-text">アカウントをお持ちでない方は</span>
+                    <a href="#" id="auth-toggle-link" onclick="toggleAuthMode(event)">新規登録</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- タグ編集モーダル -->
+    <div class="modal-overlay hidden" id="tag-modal-overlay" onclick="closeTagModal()">
+        <div class="modal modal-sm" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>🏷️ タグ編集 — <span id="tag-modal-symbol"></span></h3>
+                <button class="modal-close" onclick="closeTagModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="tag-current" id="tag-current-tags"></div>
+                <div class="tag-input-row">
+                    <input type="text" id="tag-input" placeholder="新しいタグを入力..." autocomplete="off">
+                    <button class="btn-primary btn-sm" onclick="addTagFromInput()">追加</button>
+                </div>
+                <div class="tag-presets">
+                    <span class="tag-preset-label">プリセット:</span>
+                    <button class="tag-preset" onclick="addPresetTag('テック')">テック</button>
+                    <button class="tag-preset" onclick="addPresetTag('高配当')">高配当</button>
+                    <button class="tag-preset" onclick="addPresetTag('バリュー')">バリュー</button>
+                    <button class="tag-preset" onclick="addPresetTag('グロース')">グロース</button>
+                    <button class="tag-preset" onclick="addPresetTag('ディフェンシブ')">ディフェンシブ</button>
+                    <button class="tag-preset" onclick="addPresetTag('小型株')">小型株</button>
+                    <button class="tag-preset" onclick="addPresetTag('大型株')">大型株</button>
+                    <button class="tag-preset" onclick="addPresetTag('日本株')">日本株</button>
+                    <button class="tag-preset" onclick="addPresetTag('米国株')">米国株</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- フィルタ設定モーダル -->
+    <div class="modal-overlay hidden" id="filter-modal-overlay" onclick="closeFilterModal()">
+        <div class="modal modal-sm" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>🔍 タグで絞り込み</h3>
+                <button class="modal-close" onclick="closeFilterModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="filter-tags-container">
+                    <p class="filter-empty-note">タグが設定された銘柄がありません</p>
+                </div>
+                <div class="filter-actions">
+                    <button class="btn-outline-danger" onclick="clearTagFilter(); closeFilterModal()">フィルタ解除</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 詳細ビュー -->
     <main id="detail-view" class="view active">
@@ -155,15 +246,28 @@
         <section class="list-header-section">
             <div class="list-header-row">
                 <h2>📋 銘柄リスト比較</h2>
-                <div class="list-add-form">
-                    <input type="text" id="list-add-input" placeholder="ティッカーを追加..." autocomplete="off">
-                    <button id="list-add-btn" onclick="addToList()">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        追加
+                <div class="list-controls">
+                    <div class="list-add-form">
+                        <input type="text" id="list-add-input" placeholder="ティッカーを追加..." autocomplete="off">
+                        <button id="list-add-btn" onclick="addToList()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            追加
+                        </button>
+                    </div>
+                    <button class="btn-filter" id="btn-filter" onclick="openFilterModal()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                        <span id="filter-btn-label">フィルタ</span>
                     </button>
                 </div>
             </div>
             <p class="list-description">複数の銘柄を追加して、指標を比較できます。列ヘッダーをクリックすると並び替えできます。</p>
+
+            <!-- アクティブフィルタ表示 -->
+            <div class="active-filter-bar hidden" id="active-filter-bar">
+                <span class="active-filter-label">🏷️ フィルタ中:</span>
+                <span class="active-filter-tag" id="active-filter-tag"></span>
+                <button class="active-filter-clear" onclick="clearTagFilter()">✕ 解除</button>
+            </div>
         </section>
 
         <!-- リストが空の場合 -->
@@ -197,6 +301,7 @@
                             <th class="sortable numeric" data-sort="roe" onclick="sortTable('roe')">ROE <span class="sort-arrow"></span></th>
                             <th class="sortable numeric" data-sort="mix_index" onclick="sortTable('mix_index')">ミックス指数 <span class="sort-arrow"></span></th>
                             <th class="sortable numeric" data-sort="dividend_yield" onclick="sortTable('dividend_yield')">配当利回り <span class="sort-arrow"></span></th>
+                            <th>タグ</th>
                             <th>操作</th>
                         </tr>
                     </thead>
@@ -205,6 +310,9 @@
             </div>
         </section>
     </main>
+
+    <!-- トースト通知 -->
+    <div class="toast-container" id="toast-container"></div>
 
     <footer>
         <p>Stock Analyzer — Powered by yfinance & GNews</p>

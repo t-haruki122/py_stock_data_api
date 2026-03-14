@@ -1,7 +1,7 @@
 """SQLAlchemy データベースモデル"""
 
 from datetime import datetime
-from sqlalchemy import String, Float, Integer, BigInteger, DateTime, Text
+from sqlalchemy import String, Float, Integer, BigInteger, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -95,3 +95,43 @@ class Indicator(Base):
     cached_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
+
+
+class User(Base):
+    """ユーザー"""
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+
+
+class UserList(Base):
+    """ユーザーの銘柄リスト"""
+    __tablename__ = "user_lists"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+
+class UserListItem(Base):
+    """リスト内の銘柄アイテム"""
+    __tablename__ = "user_list_items"
+    __table_args__ = (
+        UniqueConstraint("list_id", "symbol", name="uq_list_symbol"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    list_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_lists.id", ondelete="CASCADE"), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    tags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON文字列 例: '["テック","高配当"]'
