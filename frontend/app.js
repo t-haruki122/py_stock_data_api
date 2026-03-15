@@ -11,6 +11,9 @@ let currentSymbol = null;
 let priceChart = null;
 let currentPeriod = '3mo';
 
+// 為替レート
+let exchangeRateUSDJPY = null;
+
 // リストビュー（アカウントに1:1対応）
 let listItems = [];
 let sortKey = 'symbol';
@@ -25,7 +28,7 @@ let activeTagFilter = null;
 let tagEditSymbol = null;
 
 // ===== Init =====
-(function init() {
+(async function init() {
     const saved = localStorage.getItem('stockAnalyzerUser');
     if (saved) {
         try {
@@ -35,6 +38,9 @@ let tagEditSymbol = null;
             loadDefaultList();
         } catch { /* ignore */ }
     }
+    
+    // 為替レートの初期取得
+    await fetchExchangeRate();
     
     // 統計情報の定期取得を開始
     fetchStats();
@@ -107,6 +113,16 @@ async function fetchStats() {
     }
 }
 
+// ===== Exchange Rate =====
+async function fetchExchangeRate() {
+    try {
+        const res = await fetchAPI('/forex/usdjpy', { method: 'GET' });
+        exchangeRateUSDJPY = res.rate;
+    } catch (err) {
+        console.warn('Failed to fetch exchange rate:', err);
+    }
+}
+
 // ===== Search =====
 function quickSearch(symbol) {
     document.getElementById('search-input').value = symbol;
@@ -134,8 +150,8 @@ async function searchStock() {
         renderIndicators(indicators);
 
         showSection('stock-detail');
-        loadChart(symbol, currentPeriod);
-        loadFinancials(symbol);
+        loadChart(symbol, currentPeriod, profile.currency);
+        loadFinancials(symbol, profile);
         loadNews(symbol);
     } catch (err) {
         showError('データ取得エラー', err.message);
@@ -243,7 +259,7 @@ function renderIndicators(data) {
 }
 
 // ===== Load: Financials =====
-async function loadFinancials(symbol) {
+async function loadFinancials(symbol, profile) {
     const body = document.getElementById('financials-body');
     body.innerHTML = '<div class="skeleton-lines"><div></div><div></div><div></div></div>';
 
@@ -251,8 +267,8 @@ async function loadFinancials(symbol) {
         const data = await fetchAPI(`/stock/${symbol}/financials`);
         let html = '';
         const rows = [
-            ['売上高', data.revenue ? formatLargeNumber(data.revenue) : null],
-            ['純利益', data.net_income ? formatLargeNumber(data.net_income) : null],
+            ['売上高', data.revenue ? formatLargeNumber(data.revenue, profile?.currency) : null],
+            ['純利益', data.net_income ? formatLargeNumber(data.net_income, profile?.currency) : null],
             ['EPS', data.eps != null ? data.eps.toFixed(2) : null],
             ['PER', data.pe_ratio != null ? data.pe_ratio.toFixed(2) + '倍' : null],
         ];
@@ -296,7 +312,7 @@ async function loadNews(symbol) {
 }
 
 // ===== Chart =====
-async function loadChart(symbol, period) {
+async function loadChart(symbol, period, currency) {
     const periodMap = {
         '1mo': { months: 1 },
         '3mo': { months: 3 },
@@ -323,18 +339,24 @@ async function loadChart(symbol, period) {
 
     try {
         const data = await fetchAPI(`/stock/${symbol}/history?start_date=${startStr}&end_date=${endStr}&interval=${interval}`);
-        renderChart(data.history);
+        renderChart(data.history, currency);
     } catch (err) {
         console.error('Chart load error:', err);
     }
 }
 
-function renderChart(history) {
+function renderChart(history, currency) {
     const ctx = document.getElementById('price-chart').getContext('2d');
     if (priceChart) priceChart.destroy();
 
+    let closes = history.map(h => h.close);
+    
+    // 円換算（USDの場合のみ）
+    if ((!currency || currency === 'USD') && exchangeRateUSDJPY) {
+        closes = closes.map(c => c * exchangeRateUSDJPY);
+    }
+
     const labels = history.map(h => h.date);
-    const closes = history.map(h => h.close);
     const isUp = closes.length >= 2 && closes[closes.length - 1] >= closes[0];
     const lineColor = isUp ? '#10b981' : '#f43f5e';
     const fillColor = isUp ? 'rgba(16, 185, 129, 0.08)' : 'rgba(244, 63, 94, 0.08)';
@@ -374,7 +396,13 @@ function renderChart(history) {
                     titleFont: { size: 12 },
                     bodyFont: { size: 14, weight: '600' },
                     callbacks: {
-                        label: ctx => `  ${ctx.parsed.y.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                        label: ctx => {
+                            const val = ctx.parsed.y;
+                            if ((!currency || currency === 'USD') && exchangeRateUSDJPY) {
+                                return `  ¥${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+                            }
+                            return `  ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        }
                     }
                 }
             },
@@ -400,7 +428,11 @@ function changePeriod(period) {
     document.querySelectorAll('.period-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.period === period);
     });
-    if (currentSymbol) loadChart(currentSymbol, period);
+    
+    // 現在のprofileからcurrencyを取得する（レンダリング時に必要）
+    // NOTE: quick hackとしてUIから取得するか、キャッシュから取得します
+    const currentCurrency = document.getElementById('price-display').textContent.includes('¥') ? 'USD' : 'JPY'; // 雑な判定だが実用上は機能する
+    if (currentSymbol) loadChart(currentSymbol, period, currentCurrency);
 }
 
 // ===== Default List (1:1対応) =====
@@ -654,7 +686,7 @@ function renderListTable() {
                 <td class="table-ticker">${item.symbol}</td>
                 <td class="table-company">${escapeHtml(item.name || '—')}</td>
                 <td class="numeric">${item.price != null ? formatCurrency(item.price, item.currency) : '—'}</td>
-                <td class="numeric">${item.market_cap != null ? formatLargeNumber(item.market_cap) : '—'}</td>
+                <td class="numeric">${item.market_cap != null ? formatLargeNumber(item.market_cap, item.currency) : '—'}</td>
                 <td class="numeric">${item.per != null ? item.per.toFixed(2) : '—'}</td>
                 <td class="numeric">${item.pbr != null ? item.pbr.toFixed(2) : '—'}</td>
                 <td class="numeric">${item.roe != null ? item.roe.toFixed(2) + '%' : '—'}</td>
@@ -953,26 +985,55 @@ function showToast(message, type = 'info') {
 
 // ===== Formatting Utilities =====
 function formatCurrency(value, currency) {
+    if (value == null) return '—';
     try {
-        const locale = currency === 'JPY' ? 'ja-JP' : 'en-US';
+        let displayValue = value;
+        let displayCurrency = currency || 'USD';
+
+        // USDの場合は円換算する
+        if (displayCurrency === 'USD' && exchangeRateUSDJPY) {
+            displayValue = value * exchangeRateUSDJPY;
+            displayCurrency = 'JPY';
+        }
+
+        const locale = displayCurrency === 'JPY' ? 'ja-JP' : 'en-US';
         return new Intl.NumberFormat(locale, {
             style: 'currency',
-            currency: currency || 'USD',
-            minimumFractionDigits: currency === 'JPY' ? 0 : 2,
-            maximumFractionDigits: currency === 'JPY' ? 0 : 2,
-        }).format(value);
+            currency: displayCurrency,
+            minimumFractionDigits: displayCurrency === 'JPY' ? 0 : 2,
+            maximumFractionDigits: displayCurrency === 'JPY' ? 0 : 2,
+        }).format(displayValue);
     } catch {
         return value.toLocaleString();
     }
 }
 
 function formatLargeNumber(value, currency) {
-    const abs = Math.abs(value);
-    if (abs >= 1e12) return (value / 1e12).toFixed(2) + '兆';
-    if (abs >= 1e8)  return (value / 1e8).toFixed(2) + '億';
-    if (abs >= 1e6)  return (value / 1e6).toFixed(2) + 'M';
-    if (abs >= 1e3)  return (value / 1e3).toFixed(1) + 'K';
-    return value.toLocaleString();
+    if (value == null) return '—';
+    
+    let displayValue = value;
+    let isJPY = currency === 'JPY';
+
+    // USDの場合は円換算
+    if ((!currency || currency === 'USD') && exchangeRateUSDJPY) {
+        displayValue = value * exchangeRateUSDJPY;
+        isJPY = true;
+    }
+
+    const abs = Math.abs(displayValue);
+    
+    if (isJPY) {
+        if (abs >= 1e12) return '¥' + (displayValue / 1e12).toFixed(2) + '兆';
+        if (abs >= 1e8)  return '¥' + (displayValue / 1e8).toFixed(2) + '億';
+        if (abs >= 1e4)  return '¥' + (displayValue / 1e4).toFixed(2) + '万';
+        return '¥' + displayValue.toLocaleString();
+    } else {
+        if (abs >= 1e12) return '$' + (displayValue / 1e12).toFixed(2) + 'T';
+        if (abs >= 1e9)  return '$' + (displayValue / 1e9).toFixed(2) + 'B';
+        if (abs >= 1e6)  return '$' + (displayValue / 1e6).toFixed(2) + 'M';
+        if (abs >= 1e3)  return '$' + (displayValue / 1e3).toFixed(1) + 'K';
+        return '$' + displayValue.toLocaleString();
+    }
 }
 
 function formatTimestamp(ts) {

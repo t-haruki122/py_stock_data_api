@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 
 from app.config import get_settings
 from app.database import init_db
-from app.routers import stock, user, stats
+from app.routers import stock, user, stats, forex
 from app.exceptions import register_exception_handlers
 
 settings = get_settings()
@@ -47,6 +47,7 @@ app.add_middleware(
 app.include_router(stock.router)
 app.include_router(user.router)
 app.include_router(stats.router)
+app.include_router(forex.router)
 
 # 例外ハンドラー登録
 register_exception_handlers(app)

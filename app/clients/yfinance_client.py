@@ -43,6 +43,43 @@ class YFinanceClient:
         except Exception as e:
             raise ExternalAPIError(f"Failed to fetch price for {symbol}: {str(e)}")
 
+    def get_exchange_rate(self, pair: str) -> dict[str, Any]:
+        """
+        為替レートを取得
+        Args:
+            pair: 為替ペア (例: "USDJPY=X")
+        Returns:
+            {"pair": str, "rate": float, "timestamp": str}
+        """
+        try:
+            ticker = yf.Ticker(pair)
+            info = ticker.info
+
+            # ask, bid, regularMarketPrice などから価格を取得
+            rate = (
+                info.get("regularMarketPrice")
+                or info.get("previousClose")
+            )
+            
+            # yfinanceの仕様変更でinfoから取れない場合
+            if rate is None:
+                hist = ticker.history(period="1d")
+                if not hist.empty:
+                    rate = float(hist["Close"].iloc[-1])
+
+            if rate is None:
+                raise ExternalAPIError(f"Failed to fetch rate for {pair}")
+
+            timestamp = datetime.utcnow().isoformat() + "Z"
+
+            return {
+                "pair": pair.upper(),
+                "rate": float(rate),
+                "timestamp": timestamp,
+            }
+        except Exception as e:
+            raise ExternalAPIError(f"Failed to fetch exchange rate for {pair}: {str(e)}")
+
     def get_history(
         self,
         symbol: str,
