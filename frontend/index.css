@@ -469,9 +469,48 @@ body {
 }
 
 /* --- Chart --- */
+.indicator-toggles {
+    display: flex;
+    gap: var(--space-lg);
+    padding: var(--space-sm) var(--space-lg) var(--space-md);
+    border-bottom: 1px dashed rgba(255,255,255,0.05);
+    flex-wrap: wrap;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    transition: color var(--transition-fast);
+}
+
+.toggle-label:hover {
+    color: var(--text-primary);
+}
+
+.toggle-label input[type="checkbox"] {
+    accent-color: var(--accent-blue);
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+}
+
 .chart-container {
-    padding: var(--space-md) var(--space-lg) var(--space-lg);
+    padding: var(--space-md) var(--space-lg) var(--space-sm);
     height: 360px;
+}
+
+.rsi-container {
+    height: 140px;
+    padding-top: var(--space-sm);
+    border-top: 1px dashed rgba(255,255,255,0.05);
+    margin-top: var(--space-sm);
 }
 
 .period-selector {

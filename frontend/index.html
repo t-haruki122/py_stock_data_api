@@ -217,8 +217,18 @@
                         <button class="period-btn" data-period="10y" onclick="changePeriod('10y')">10Y</button>
                     </div>
                 </div>
+                <div class="indicator-toggles">
+                    <label class="toggle-label"><input type="checkbox" id="toggle-sma25" onchange="updateChartVisibility()"> SMA 25</label>
+                    <label class="toggle-label"><input type="checkbox" id="toggle-sma50" checked onchange="updateChartVisibility()"> SMA 50</label>
+                    <label class="toggle-label"><input type="checkbox" id="toggle-sma75" onchange="updateChartVisibility()"> SMA 75</label>
+                    <label class="toggle-label"><input type="checkbox" id="toggle-sma200" checked onchange="updateChartVisibility()"> SMA 200</label>
+                    <label class="toggle-label"><input type="checkbox" id="toggle-rsi" checked onchange="updateChartVisibility()"> RSI 14</label>
+                </div>
                 <div class="chart-container">
                     <canvas id="price-chart"></canvas>
+                </div>
+                <div class="chart-container rsi-container" id="rsi-container">
+                    <canvas id="rsi-chart"></canvas>
                 </div>
             </div>
 

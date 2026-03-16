@@ -9,7 +9,10 @@ const CACHE_TTL = 5 * 60 * 1000;
 
 let currentSymbol = null;
 let priceChart = null;
+let rsiChartInstance = null;
 let currentPeriod = '3mo';
+let currentChartHistory = [];
+let currentChartCurrency = null;
 
 // Stats History
 const statsHistory = [];
@@ -461,6 +464,13 @@ async function loadNews(symbol) {
     }
 }
 
+// ===== Indicators & Chart Helper =====
+function updateChartVisibility() {
+    if (currentChartHistory.length > 0) {
+        renderChart(currentChartHistory, currentChartCurrency);
+    }
+}
+
 // ===== Chart =====
 async function loadChart(symbol, period, currency) {
     const periodMap = {
@@ -489,6 +499,8 @@ async function loadChart(symbol, period, currency) {
 
     try {
         const data = await fetchAPI(`/stock/${symbol}/history?start_date=${startStr}&end_date=${endStr}&interval=${interval}`);
+        currentChartHistory = data.history;
+        currentChartCurrency = currency;
         renderChart(data.history, currency);
     } catch (err) {
         console.error('Chart load error:', err);
@@ -499,6 +511,9 @@ function renderChart(history, currency) {
     const ctx = document.getElementById('price-chart').getContext('2d');
     if (priceChart) priceChart.destroy();
 
+    const rsiCtx = document.getElementById('rsi-chart').getContext('2d');
+    if (rsiChartInstance) rsiChartInstance.destroy();
+
     let closes = history.map(h => h.close);
     
     // 円換算（USDの場合のみ）
@@ -507,28 +522,53 @@ function renderChart(history, currency) {
     }
 
     const labels = history.map(h => h.date);
+    
+    const showSma25 = document.getElementById('toggle-sma25').checked;
+    const showSma50 = document.getElementById('toggle-sma50').checked;
+    const showSma75 = document.getElementById('toggle-sma75').checked;
+    const showSma200 = document.getElementById('toggle-sma200').checked;
+    const showRSI = document.getElementById('toggle-rsi').checked;
+
+    document.getElementById('rsi-container').classList.toggle('hidden', !showRSI);
+
+    const datasets = [];
+    
     const isUp = closes.length >= 2 && closes[closes.length - 1] >= closes[0];
     const lineColor = isUp ? '#10b981' : '#f43f5e';
     const fillColor = isUp ? 'rgba(16, 185, 129, 0.08)' : 'rgba(244, 63, 94, 0.08)';
 
+    datasets.push({
+        label: '終値',
+        data: closes,
+        borderColor: lineColor,
+        backgroundColor: fillColor,
+        fill: true,
+        tension: 0.3,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHitRadius: 10,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: lineColor,
+        order: 1
+    });
+
+    const getIndicatorData = (key) => {
+        let values = history.map(h => h[key]);
+        if ((!currency || currency === 'USD') && exchangeRateUSDJPY) {
+            // 値段に関する指標は為替レートを乗算
+            values = values.map(v => v !== null && v !== undefined ? v * exchangeRateUSDJPY : null);
+        }
+        return values;
+    };
+
+    if (showSma25) datasets.push({ label: 'SMA 25', data: getIndicatorData("sma_25"), borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, order: 2 });
+    if (showSma50) datasets.push({ label: 'SMA 50', data: getIndicatorData("sma_50"), borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, order: 3 });
+    if (showSma75) datasets.push({ label: 'SMA 75', data: getIndicatorData("sma_75"), borderColor: '#8b5cf6', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, order: 4 });
+    if (showSma200) datasets.push({ label: 'SMA 200', data: getIndicatorData("sma_200"), borderColor: '#ec4899', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, order: 5 });
+
     priceChart = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: '終値',
-                data: closes,
-                borderColor: lineColor,
-                backgroundColor: fillColor,
-                fill: true,
-                tension: 0.3,
-                borderWidth: 2,
-                pointRadius: 0,
-                pointHitRadius: 10,
-                pointHoverRadius: 5,
-                pointHoverBackgroundColor: lineColor,
-            }]
-        },
+        data: { labels, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -544,14 +584,16 @@ function renderChart(history, currency) {
                     padding: 12,
                     cornerRadius: 8,
                     titleFont: { size: 12 },
-                    bodyFont: { size: 14, weight: '600' },
+                    bodyFont: { size: 13, weight: '500' },
                     callbacks: {
                         label: ctx => {
                             const val = ctx.parsed.y;
+                            const dsLabel = ctx.dataset.label;
+                            let formatted = val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                             if ((!currency || currency === 'USD') && exchangeRateUSDJPY) {
-                                return `  ¥${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+                                formatted = `¥${val.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
                             }
-                            return `  ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                            return `  ${dsLabel}: ${formatted}`;
                         }
                     }
                 }
@@ -571,6 +613,68 @@ function renderChart(history, currency) {
             }
         }
     });
+
+    if (showRSI) {
+        const rsiData = history.map(h => h.rsi_14);
+        rsiChartInstance = new Chart(rsiCtx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'RSI (14)',
+                    data: rsiData,
+                    borderColor: '#a855f7',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    pointHitRadius: 10,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: '#a855f7',
+                    tension: 0.3,
+                    fill: {
+                        target: { value: 30 },
+                        below: 'rgba(168, 85, 247, 0.1)'
+                    }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                        titleColor: '#94a3b8',
+                        bodyColor: '#f1f5f9',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8,
+                        titleFont: { size: 12 },
+                        bodyFont: { size: 13, weight: '500' },
+                        callbacks: {
+                            label: ctx => `  RSI: ${ctx.parsed.y.toFixed(1)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { display: false },
+                        border: { display: false },
+                    },
+                    y: {
+                        position: 'right',
+                        min: 0,
+                        max: 100,
+                        grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                        ticks: { color: '#64748b', font: { size: 10 }, stepSize: 30 },
+                        border: { display: false },
+                    }
+                }
+            }
+        });
+    }
 }
 
 function changePeriod(period) {

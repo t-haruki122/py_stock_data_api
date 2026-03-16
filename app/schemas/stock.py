@@ -23,6 +23,11 @@ class HistoryEntry(BaseModel):
     low: float | None = None
     close: float
     volume: int | None = None
+    sma_25: float | None = None
+    sma_50: float | None = None
+    sma_75: float | None = None
+    sma_200: float | None = None
+    rsi_14: float | None = None
 
 
 class StockHistoryResponse(BaseModel):
