@@ -714,10 +714,11 @@ async function loadDefaultList() {
 
 async function loadListItemData(symbol, tags) {
     try {
-        const [price, profile, indicators] = await Promise.all([
+        const [price, profile, indicators, memo] = await Promise.all([
             fetchAPI(`/stock/${symbol}`),
             fetchAPI(`/stock/${symbol}/profile`),
             fetchAPI(`/stock/${symbol}/indicators`),
+            fetchStockMemo(symbol),
         ]);
 
         const idx = listItems.findIndex(i => i.symbol === symbol);
@@ -735,6 +736,7 @@ async function loadListItemData(symbol, tags) {
                 mix_index: indicators.mix_index,
                 dividend_yield: indicators.dividend_yield,
                 tags: tags || [],
+                memo,
             };
             renderListTable();
         }
@@ -745,6 +747,45 @@ async function loadListItemData(symbol, tags) {
             listItems[idx].name = '(取得失敗)';
             renderListTable();
         }
+    }
+}
+
+async function fetchStockMemo(symbol) {
+    if (!currentUser) return null;
+    try {
+        const data = await fetchAPI(`/user/${currentUser.id}/memo/${symbol}`);
+        return data.memo || null;
+    } catch (err) {
+        console.warn('Memo fetch failed:', err);
+        return null;
+    }
+}
+
+async function editStockMemo(symbol) {
+    if (!currentUser) {
+        showToast('メモ機能はログインが必要です', 'warning');
+        return;
+    }
+
+    const item = listItems.find(i => i.symbol === symbol);
+    const currentMemo = item?.memo || '';
+    const input = window.prompt(`${symbol} のメモを入力`, currentMemo);
+    if (input === null) return;
+
+    const memo = input.trim() === '' ? null : input.trim();
+
+    try {
+        const saved = await fetchAPI(`/user/${currentUser.id}/memo/${symbol}`, {
+            method: 'PUT',
+            body: JSON.stringify({ memo }),
+        });
+        if (item) {
+            item.memo = saved.memo || null;
+            renderListTable();
+        }
+        showToast('メモを保存しました', 'success');
+    } catch (err) {
+        showToast(`メモ保存に失敗しました: ${err.message}`, 'error');
     }
 }
 
@@ -779,10 +820,11 @@ async function addToList() {
     }
 
     try {
-        const [price, profile, indicators] = await Promise.all([
+        const [price, profile, indicators, memo] = await Promise.all([
             fetchAPI(`/stock/${symbol}`),
             fetchAPI(`/stock/${symbol}/profile`),
             fetchAPI(`/stock/${symbol}/indicators`),
+            fetchStockMemo(symbol),
         ]);
 
         const idx = listItems.findIndex(i => i.symbol === symbol);
@@ -800,6 +842,7 @@ async function addToList() {
                 mix_index: indicators.mix_index,
                 dividend_yield: indicators.dividend_yield,
                 tags: listItems[idx].tags || [],
+                memo,
             };
             renderListTable();
         }
@@ -920,7 +963,7 @@ function renderListTable() {
             html += `
                 <tr class="row-loading">
                     <td class="table-ticker">${item.symbol}</td>
-                    <td colspan="9" style="color:var(--text-muted)">読み込み中...</td>
+                    <td colspan="10" style="color:var(--text-muted)">読み込み中...</td>
                     <td><button class="btn-remove" onclick="event.stopPropagation(); removeFromList('${item.symbol}')">削除</button></td>
                 </tr>`;
             return;
@@ -935,6 +978,11 @@ function renderListTable() {
         }
         tagsHtml += `<button class="btn-tag-edit" onclick="event.stopPropagation(); openTagModal('${item.symbol}')" title="タグ編集">🏷️</button>`;
 
+        const memoPreview = item.memo
+            ? escapeHtml(item.memo.length > 24 ? `${item.memo.slice(0, 24)}...` : item.memo)
+            : '<span class="memo-empty">未入力</span>';
+        const memoTitle = item.memo ? escapeAttr(item.memo) : '';
+
         html += `
             <tr onclick="goToDetail('${item.symbol}')">
                 <td class="table-ticker">${item.symbol}</td>
@@ -947,6 +995,7 @@ function renderListTable() {
                 <td class="numeric">${item.mix_index != null ? item.mix_index.toFixed(2) : '—'}</td>
                 <td class="numeric">${item.dividend_yield != null ? item.dividend_yield.toFixed(2) + '%' : '—'}</td>
                 <td class="table-tags" onclick="event.stopPropagation()">${tagsHtml}</td>
+                <td class="table-memo" onclick="event.stopPropagation()"><button class="btn-memo" onclick="event.stopPropagation(); editStockMemo('${item.symbol}')">📝</button><span class="memo-preview" title="${memoTitle}">${memoPreview}</span></td>
                 <td><button class="btn-remove" onclick="event.stopPropagation(); removeFromList('${item.symbol}')">削除</button></td>
             </tr>`;
     });

@@ -135,3 +135,19 @@ class UserListItem(Base):
     list_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_lists.id", ondelete="CASCADE"), nullable=False)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False)
     tags: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON文字列 例: '["テック","高配当"]'
+
+
+class StockMemo(Base):
+    """ユーザーごとの銘柄メモ"""
+    __tablename__ = "stock_memos"
+    __table_args__ = (
+        UniqueConstraint("user_id", "symbol", name="uq_user_symbol_memo"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    memo: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )

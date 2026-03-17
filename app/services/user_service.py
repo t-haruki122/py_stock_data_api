@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.db_models import User, UserList, UserListItem
+from app.models.db_models import User, UserList, UserListItem, StockMemo
 
 
 def _hash_password(password: str) -> str:
@@ -256,3 +256,43 @@ async def update_item_tags(
     await db.commit()
     await db.refresh(item)
     return item
+
+# ========== 銘柄メモ ==========
+
+async def get_stock_memo(user_id: int, symbol: str, db: AsyncSession) -> StockMemo | None:
+    """ユーザーの銘柄メモを取得"""
+    result = await db.execute(
+        select(StockMemo).where(
+            StockMemo.user_id == user_id,
+            StockMemo.symbol == symbol.upper(),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def save_stock_memo(
+    user_id: int,
+    symbol: str,
+    memo: str | None,
+    db: AsyncSession,
+) -> StockMemo:
+    """ユーザーの銘柄メモを保存（作成または更新）"""
+    normalized_symbol = symbol.upper()
+    existing_memo = await get_stock_memo(user_id, normalized_symbol, db)
+
+    if existing_memo:
+        existing_memo.memo = memo
+        existing_memo.updated_at = datetime.utcnow()
+        await db.commit()
+        await db.refresh(existing_memo)
+        return existing_memo
+
+    new_memo = StockMemo(
+        user_id=user_id,
+        symbol=normalized_symbol,
+        memo=memo,
+    )
+    db.add(new_memo)
+    await db.commit()
+    await db.refresh(new_memo)
+    return new_memo

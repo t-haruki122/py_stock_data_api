@@ -1534,6 +1534,38 @@ footer {
     opacity: 1;
 }
 
+.table-memo {
+    white-space: normal;
+    min-width: 190px;
+}
+
+.btn-memo {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-glass);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    margin-right: var(--space-xs);
+    padding: 2px 6px;
+    transition: all var(--transition-fast);
+}
+
+.btn-memo:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.memo-preview {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.memo-empty {
+    color: var(--text-muted);
+}
+
 /* ========================================
    List Controls
    ======================================== */

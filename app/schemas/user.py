@@ -77,3 +77,15 @@ class ListsResponse(BaseModel):
 class MessageResponse(BaseModel):
     """汎用メッセージレスポンス"""
     message: str
+
+
+class StockMemoRequest(BaseModel):
+    """銘柄メモ保存リクエスト"""
+    memo: str | None = None
+
+
+class StockMemoResponse(BaseModel):
+    """銘柄メモレスポンス"""
+    symbol: str
+    memo: str | None = None
+    updated_at: str | None = None

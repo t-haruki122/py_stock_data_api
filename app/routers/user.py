@@ -18,6 +18,8 @@ from app.schemas.user import (
     ListsResponse,
     ListItemResponse,
     MessageResponse,
+    StockMemoRequest,
+    StockMemoResponse,
 )
 from app.services import user_service
 
@@ -221,3 +223,50 @@ async def update_tags(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+# ========== 銘柄メモ ==========
+
+@router.get(
+    "/{user_id}/memo/{symbol}",
+    response_model=StockMemoResponse,
+    summary="銘柄メモを取得",
+)
+async def get_memo(user_id: int, symbol: str, db: AsyncSession = Depends(get_db)):
+    """銘柄メモを取得"""
+    memo = await user_service.get_stock_memo(user_id, symbol, db)
+    if not memo:
+        return StockMemoResponse(
+            symbol=symbol.upper(),
+            memo=None,
+            updated_at=None,
+        )
+    return StockMemoResponse(
+        symbol=memo.symbol,
+        memo=memo.memo,
+        updated_at=memo.updated_at.isoformat(),
+    )
+
+
+@router.put(
+    "/{user_id}/memo/{symbol}",
+    response_model=StockMemoResponse,
+    summary="銘柄メモを保存",
+)
+async def save_memo(
+    user_id: int,
+    symbol: str,
+    req: StockMemoRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """銘柄メモを作成または更新"""
+    memo = await user_service.save_stock_memo(
+        user_id,
+        symbol,
+        req.memo,
+        db,
+    )
+    return StockMemoResponse(
+        symbol=memo.symbol,
+        memo=memo.memo,
+        updated_at=memo.updated_at.isoformat(),
+    )
