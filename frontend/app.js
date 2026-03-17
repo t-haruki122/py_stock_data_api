@@ -33,6 +33,10 @@ let sortAsc = true;
 let currentUser = null;
 let currentListId = null;
 
+// 削除確認（2段階）
+let pendingDeleteSymbol = null;
+let pendingDeleteTimer = null;
+
 // タグフィルター
 let activeTagFilter = null;
 let tagEditSymbol = null;
@@ -887,6 +891,13 @@ async function addToList() {
 
 async function removeFromList(symbol) {
     listItems = listItems.filter(i => i.symbol !== symbol);
+    if (pendingDeleteSymbol === symbol) {
+        pendingDeleteSymbol = null;
+    }
+    if (pendingDeleteTimer) {
+        clearTimeout(pendingDeleteTimer);
+        pendingDeleteTimer = null;
+    }
     renderListTable();
 
     // サーバーからも削除
@@ -897,6 +908,25 @@ async function removeFromList(symbol) {
             console.warn('Server remove failed:', err);
         }
     }
+}
+
+function requestRemoveFromList(symbol) {
+    if (pendingDeleteSymbol === symbol) {
+        removeFromList(symbol);
+        return;
+    }
+
+    pendingDeleteSymbol = symbol;
+    if (pendingDeleteTimer) {
+        clearTimeout(pendingDeleteTimer);
+    }
+    pendingDeleteTimer = setTimeout(() => {
+        pendingDeleteSymbol = null;
+        pendingDeleteTimer = null;
+        renderListTable();
+    }, 4000);
+
+    renderListTable();
 }
 
 function sortTable(key) {
@@ -986,11 +1016,12 @@ function renderListTable() {
 
     sorted.forEach(item => {
         if (item.loading) {
+            const isPendingDelete = pendingDeleteSymbol === item.symbol;
             html += `
                 <tr class="row-loading">
                     <td class="table-ticker">${item.symbol}</td>
                     <td colspan="7" style="color:var(--text-muted)">読み込み中...</td>
-                    <td><button class="btn-remove" onclick="event.stopPropagation(); removeFromList('${item.symbol}')">削除</button></td>
+                    <td><button class="btn-remove ${isPendingDelete ? 'confirm' : ''}" onclick="event.stopPropagation(); requestRemoveFromList('${item.symbol}')">${isPendingDelete ? 'OK?' : '削除'}</button></td>
                 </tr>`;
             return;
         }
@@ -1011,6 +1042,7 @@ function renderListTable() {
         const marketCapCategory = getMarketCapCategory(item.market_cap, item.currency);
         const mixRating = getMixIndexRating(item.mix_index);
         const mixBadge = mixRating ? `<span class="indicator-badge ${mixRating}">${getRatingSymbol(mixRating)}</span>` : '';
+        const isPendingDelete = pendingDeleteSymbol === item.symbol;
 
         html += `
             <tr onclick="goToDetail('${item.symbol}')">
@@ -1022,7 +1054,7 @@ function renderListTable() {
                 <td class="numeric">${item.dividend_yield != null ? item.dividend_yield.toFixed(2) + '%' : '—'}</td>
                 <td class="table-tags" onclick="event.stopPropagation()">${tagsHtml}</td>
                 <td class="table-memo" onclick="event.stopPropagation()"><button class="btn-memo" onclick="event.stopPropagation(); editStockMemo('${item.symbol}')">📝</button><span class="memo-preview" title="${memoTitle}">${memoPreview}</span></td>
-                <td><button class="btn-remove" onclick="event.stopPropagation(); removeFromList('${item.symbol}')">削除</button></td>
+                <td><button class="btn-remove ${isPendingDelete ? 'confirm' : ''}" onclick="event.stopPropagation(); requestRemoveFromList('${item.symbol}')">${isPendingDelete ? 'OK?' : '削除'}</button></td>
             </tr>`;
     });
 

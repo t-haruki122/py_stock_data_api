@@ -905,6 +905,12 @@ body {
     color: white;
 }
 
+.btn-remove.confirm {
+    background: var(--accent-amber);
+    color: white;
+    border-color: var(--accent-amber);
+}
+
 .row-loading td {
     text-align: center;
     color: var(--text-muted);
