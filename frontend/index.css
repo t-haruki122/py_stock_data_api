@@ -580,6 +580,59 @@ body {
     font-weight: 700;
 }
 
+.financial-history-chart-wrap {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.mini-chart-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.mini-chart-header {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.metric-toggle {
+    display: inline-flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+}
+
+.metric-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.metric-btn:hover {
+    color: var(--text-primary);
+}
+
+.metric-btn.active {
+    background: var(--accent-blue);
+    color: #fff;
+}
+
+.financial-history-chart-container {
+    height: 220px;
+}
+
 /* --- Indicator Badge --- */
 .indicator-badge {
     display: inline-flex;

@@ -8,6 +8,7 @@ from app.schemas.stock import (
     StockPriceResponse,
     StockHistoryResponse,
     FinancialResponse,
+    FinancialHistoryResponse,
     NewsResponse,
     CompanyProfileResponse,
     IndicatorsResponse,
@@ -55,6 +56,21 @@ async def get_stock_history(
 async def get_financials(symbol: str, db: AsyncSession = Depends(get_db)):
     """財務情報を取得"""
     return await finance_service.get_financials(symbol, db)
+
+
+@router.get(
+    "/{symbol}/financials/history",
+    response_model=FinancialHistoryResponse,
+    summary="過去の財務情報を取得",
+    description="指定されたシンボルの年次財務履歴（売上高・純利益）を返します。",
+)
+async def get_financial_history(
+    symbol: str,
+    limit: int = Query(6, ge=1, le=10, description="取得する年次データ件数"),
+    db: AsyncSession = Depends(get_db),
+):
+    """過去の財務情報を取得"""
+    return await finance_service.get_financial_history(symbol, db, limit=limit)
 
 
 @router.get(

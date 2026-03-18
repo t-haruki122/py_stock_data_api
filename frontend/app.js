@@ -10,6 +10,9 @@ const CACHE_TTL = 5 * 60 * 1000;
 let currentSymbol = null;
 let priceChart = null;
 let rsiChartInstance = null;
+let financialChartInstance = null;
+let currentFinancialHistory = [];
+let currentFinancialMetric = 'net_income';
 let currentPeriod = '3mo';
 let currentChartHistory = [];
 let currentChartCurrency = null;
@@ -453,7 +456,10 @@ async function loadFinancials(symbol, profile) {
     body.innerHTML = '<div class="skeleton-lines"><div></div><div></div><div></div></div>';
 
     try {
-        const data = await fetchAPI(`/stock/${symbol}/financials`);
+        const [data, historyData] = await Promise.all([
+            fetchAPI(`/stock/${symbol}/financials`),
+            fetchAPI(`/stock/${symbol}/financials/history?limit=8`),
+        ]);
         let html = '';
         const rows = [
             ['売上高', data.revenue ? formatLargeNumber(data.revenue, profile?.currency) : null],
@@ -464,10 +470,114 @@ async function loadFinancials(symbol, profile) {
         rows.forEach(([label, value]) => {
             html += `<div class="data-row"><span class="data-label">${label}</span><span class="data-value">${value || '—'}</span></div>`;
         });
+        html += `
+            <div class="financial-history-chart-wrap">
+                <div class="mini-chart-header-row">
+                    <div class="mini-chart-header">過去の財務推移（年次）</div>
+                    <div class="metric-toggle" role="group" aria-label="財務指標の切り替え">
+                        <button class="metric-btn" id="metric-revenue" onclick="changeFinancialMetric('revenue')">売上高</button>
+                        <button class="metric-btn active" id="metric-net-income" onclick="changeFinancialMetric('net_income')">純利益</button>
+                    </div>
+                </div>
+                <div class="financial-history-chart-container">
+                    <canvas id="financials-history-chart"></canvas>
+                </div>
+            </div>`;
         body.innerHTML = html || '<p style="color:var(--text-muted)">データなし</p>';
+        currentFinancialHistory = historyData?.history || [];
+        currentFinancialMetric = 'net_income';
+        renderFinancialHistoryChart(currentFinancialHistory, currentFinancialMetric);
     } catch (err) {
         body.innerHTML = `<p style="color:var(--accent-rose)">取得失敗: ${err.message}</p>`;
     }
+}
+
+function changeFinancialMetric(metric) {
+    currentFinancialMetric = metric;
+    document.getElementById('metric-revenue')?.classList.toggle('active', metric === 'revenue');
+    document.getElementById('metric-net-income')?.classList.toggle('active', metric === 'net_income');
+    renderFinancialHistoryChart(currentFinancialHistory, currentFinancialMetric);
+}
+
+function renderFinancialHistoryChart(history, metric = 'net_income') {
+    if (financialChartInstance) {
+        financialChartInstance.destroy();
+        financialChartInstance = null;
+    }
+
+    const canvas = document.getElementById('financials-history-chart');
+    if (!canvas || !history || history.length === 0) {
+        return;
+    }
+
+    const labels = history.map(item => item.period);
+    const isRevenue = metric === 'revenue';
+    const series = history.map(item => item[metric]);
+    const label = isRevenue ? '売上高' : '純利益';
+    const barColor = isRevenue
+        ? 'rgba(59, 130, 246, 0.65)'
+        : series.map(v => (v != null && v < 0 ? 'rgba(239, 68, 68, 0.75)' : 'rgba(16, 185, 129, 0.65)'));
+    const borderColor = isRevenue
+        ? '#3b82f6'
+        : series.map(v => (v != null && v < 0 ? '#ef4444' : '#10b981'));
+
+    financialChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label,
+                data: series,
+                backgroundColor: barColor,
+                borderColor,
+                borderWidth: 1,
+                borderRadius: 6,
+                maxBarThickness: 44,
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    titleColor: '#94a3b8',
+                    bodyColor: '#f1f5f9',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: ctx => `  ${label}: ${formatLargeNumber(ctx.parsed.y)}`,
+                    },
+                },
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#64748b', font: { size: 11 } },
+                    grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                    border: { display: false },
+                },
+                y: {
+                    ticks: {
+                        color: '#64748b',
+                        font: { size: 11 },
+                        callback: value => formatAbbreviatedNumber(value),
+                    },
+                    grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                    border: { display: false },
+                },
+            },
+        },
+    });
+}
+
+function formatAbbreviatedNumber(value) {
+    const abs = Math.abs(Number(value));
+    if (abs >= 1_000_000_000_000) return `${(value / 1_000_000_000_000).toFixed(1)}T`;
+    if (abs >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+    if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    return Number(value).toLocaleString();
 }
 
 // ===== Load: News =====

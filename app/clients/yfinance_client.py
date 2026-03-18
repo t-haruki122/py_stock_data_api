@@ -2,6 +2,7 @@
 
 import yfinance as yf
 from datetime import datetime, date
+import math
 from typing import Any
 
 from app.exceptions import SymbolNotFoundError, ExternalAPIError
@@ -164,6 +165,62 @@ class YFinanceClient:
         except Exception as e:
             raise ExternalAPIError(
                 f"Failed to fetch financials for {symbol}: {str(e)}"
+            )
+
+    def get_financial_history(self, symbol: str, limit: int = 6) -> dict[str, Any]:
+        """
+        年次の財務履歴（売上高・純利益）を取得
+
+        Returns:
+            {"symbol": str, "history": [{"period": str, "revenue": int, "net_income": int}, ...]}
+        """
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+
+            if not info or info.get("quoteType") is None:
+                raise SymbolNotFoundError(symbol)
+
+            financials = ticker.financials
+            if financials is None or financials.empty:
+                return {"symbol": symbol.upper(), "history": []}
+
+            entries: list[dict[str, Any]] = []
+            columns = list(financials.columns)
+
+            for col in columns:
+                period_label = col.strftime("%Y") if isinstance(col, (datetime, date)) else str(col)
+
+                revenue = None
+                net_income = None
+                if "Total Revenue" in financials.index:
+                    raw_revenue = financials.at["Total Revenue", col]
+                    if raw_revenue is not None and not (isinstance(raw_revenue, float) and math.isnan(raw_revenue)):
+                        revenue = int(raw_revenue)
+                if "Net Income" in financials.index:
+                    raw_net_income = financials.at["Net Income", col]
+                    if raw_net_income is not None and not (isinstance(raw_net_income, float) and math.isnan(raw_net_income)):
+                        net_income = int(raw_net_income)
+
+                entries.append(
+                    {
+                        "period": period_label,
+                        "revenue": revenue,
+                        "net_income": net_income,
+                    }
+                )
+
+            # yfinanceは新しい期間が先頭になりやすいので、古い順に整列
+            entries.sort(key=lambda x: x["period"])
+            if limit > 0:
+                entries = entries[-limit:]
+
+            return {"symbol": symbol.upper(), "history": entries}
+        except SymbolNotFoundError:
+            raise
+        except Exception as e:
+            raise ExternalAPIError(
+                f"Failed to fetch financial history for {symbol}: {str(e)}"
             )
 
     def get_company_profile(self, symbol: str) -> dict[str, Any]:

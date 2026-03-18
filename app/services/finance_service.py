@@ -58,3 +58,12 @@ async def get_financials(symbol: str, db: AsyncSession) -> dict:
     await db.commit()
 
     return data
+
+
+async def get_financial_history(symbol: str, db: AsyncSession, limit: int = 6) -> dict:
+    """過去の年次財務データを取得"""
+    # 財務履歴は呼び出し頻度が低く、銘柄ごとに件数も少ないため都度取得とする
+    # （必要に応じて将来DBキャッシュ化）
+    del db
+    stats.log_api_call()
+    return _client.get_financial_history(symbol, limit=limit)

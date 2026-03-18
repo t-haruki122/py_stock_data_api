@@ -47,6 +47,19 @@ class FinancialResponse(BaseModel):
     pe_ratio: float | None = None
 
 
+class FinancialHistoryEntry(BaseModel):
+    """過去財務情報の1レコード"""
+    period: str
+    revenue: int | None = None
+    net_income: int | None = None
+
+
+class FinancialHistoryResponse(BaseModel):
+    """過去財務情報レスポンス"""
+    symbol: str
+    history: list[FinancialHistoryEntry]
+
+
 # --- ニュース ---
 
 class NewsEntry(BaseModel):

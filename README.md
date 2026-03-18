@@ -20,6 +20,7 @@
 - 現在株価: `GET /stock/{symbol}`
 - 過去株価: `GET /stock/{symbol}/history`
 - 財務情報: `GET /stock/{symbol}/financials`
+- 財務履歴: `GET /stock/{symbol}/financials/history`
 - 企業プロフィール: `GET /stock/{symbol}/profile`
 - 投資指標: `GET /stock/{symbol}/indicators`
 - 関連ニュース: `GET /stock/{symbol}/news`
@@ -91,6 +92,9 @@ curl "http://localhost:8000/stock/AAPL/history?start_date=2025-01-01&end_date=20
 
 # 会社プロフィール
 curl http://localhost:8000/stock/AAPL/profile
+
+# 財務履歴（年次）
+curl "http://localhost:8000/stock/AAPL/financials/history?limit=8"
 
 # 投資指標
 curl http://localhost:8000/stock/AAPL/indicators
