@@ -1,5 +1,6 @@
 """ニュースサービス - キャッシュ付きニュース取得"""
 
+import logging
 from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,7 @@ from app.stats import stats
 settings = get_settings()
 _news_client = NewsClient()
 _yf_client = YFinanceClient()
+logger = logging.getLogger("app.services.news")
 
 
 async def get_news(symbol: str, db: AsyncSession) -> dict:
@@ -48,6 +50,10 @@ async def get_news(symbol: str, db: AsyncSession) -> dict:
     company_name = None
     try:
         import yfinance as yf
+        logger.info(
+            "External API call: yfinance company_name_lookup symbol=%s",
+            symbol.upper(),
+        )
         ticker = yf.Ticker(symbol)
         company_name = ticker.info.get("shortName") or ticker.info.get("longName")
     except Exception:

@@ -1,9 +1,13 @@
 """ニュース取得クライアント"""
 
+import logging
 from gnews import GNews
 from typing import Any
 
 from app.exceptions import ExternalAPIError
+
+
+logger = logging.getLogger("app.external.gnews")
 
 
 class NewsClient:
@@ -30,6 +34,7 @@ class NewsClient:
         try:
             # 会社名があればそれを使い、なければシンボル + "stock" で検索
             query = f"{company_name} stock" if company_name else f"{symbol} stock"
+            logger.info("External API call: gnews get_news query=%s", query)
             articles = self._gnews.get_news(query)
 
             if not articles:

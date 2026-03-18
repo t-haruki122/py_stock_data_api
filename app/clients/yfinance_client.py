@@ -1,11 +1,15 @@
 """yfinance ラッパークライアント"""
 
+import logging
 import yfinance as yf
 from datetime import datetime, date
 import math
 from typing import Any
 
 from app.exceptions import SymbolNotFoundError, ExternalAPIError
+
+
+logger = logging.getLogger("app.external.yfinance")
 
 
 class YFinanceClient:
@@ -19,6 +23,7 @@ class YFinanceClient:
             {"symbol": str, "price": float, "timestamp": str}
         """
         try:
+            logger.info("External API call: yfinance get_current_price symbol=%s", symbol.upper())
             ticker = yf.Ticker(symbol)
             info = ticker.info
 
@@ -53,6 +58,7 @@ class YFinanceClient:
             {"pair": str, "rate": float, "timestamp": str}
         """
         try:
+            logger.info("External API call: yfinance get_exchange_rate pair=%s", pair.upper())
             ticker = yf.Ticker(pair)
             info = ticker.info
 
@@ -102,6 +108,13 @@ class YFinanceClient:
               "close": float, "volume": int}, ...]
         """
         try:
+            logger.info(
+                "External API call: yfinance get_history symbol=%s interval=%s start=%s end=%s",
+                symbol.upper(),
+                interval,
+                start_date,
+                end_date,
+            )
             ticker = yf.Ticker(symbol)
 
             # デフォルトは直近1ヶ月
@@ -147,6 +160,7 @@ class YFinanceClient:
              "eps": float, "pe_ratio": float}
         """
         try:
+            logger.info("External API call: yfinance get_financials symbol=%s", symbol.upper())
             ticker = yf.Ticker(symbol)
             info = ticker.info
 
@@ -175,6 +189,11 @@ class YFinanceClient:
             {"symbol": str, "history": [{"period": str, "revenue": int, "net_income": int}, ...]}
         """
         try:
+            logger.info(
+                "External API call: yfinance get_financial_history symbol=%s limit=%s",
+                symbol.upper(),
+                limit,
+            )
             ticker = yf.Ticker(symbol)
             info = ticker.info
 
@@ -233,6 +252,7 @@ class YFinanceClient:
              "website": str, "country": str}
         """
         try:
+            logger.info("External API call: yfinance get_company_profile symbol=%s", symbol.upper())
             ticker = yf.Ticker(symbol)
             info = ticker.info
 
@@ -268,6 +288,7 @@ class YFinanceClient:
              "mix_index": float, "profit_margin": float, "debt_to_equity": float}
         """
         try:
+            logger.info("External API call: yfinance get_indicators symbol=%s", symbol.upper())
             ticker = yf.Ticker(symbol)
             info = ticker.info
 
