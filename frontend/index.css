@@ -766,7 +766,8 @@ body {
     gap: var(--space-sm);
 }
 
-.list-add-form input {
+.list-add-form input,
+#list-search-input {
     padding: var(--space-sm) var(--space-md);
     background: var(--bg-input);
     border: 1px solid var(--border-color);
@@ -779,12 +780,14 @@ body {
     width: 220px;
 }
 
-.list-add-form input:focus {
+.list-add-form input:focus,
+#list-search-input:focus {
     border-color: var(--accent-blue);
     box-shadow: var(--shadow-glow);
 }
 
-.list-add-form input::placeholder {
+.list-add-form input::placeholder,
+#list-search-input::placeholder {
     color: var(--text-muted);
 }
 
@@ -812,6 +815,12 @@ body {
 .list-description {
     color: var(--text-muted);
     font-size: 0.875rem;
+}
+
+.list-search-hint {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: var(--space-xs);
 }
 
 /* --- List Empty --- */

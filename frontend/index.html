@@ -140,6 +140,23 @@
         </div>
     </div>
 
+    <!-- 銘柄追加モーダル -->
+    <div class="modal-overlay hidden" id="list-add-modal-overlay" onclick="closeListAddModal()">
+        <div class="modal modal-sm" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>➕ 銘柄を追加</h3>
+                <button class="modal-close" onclick="closeListAddModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="list-add-modal-input">ティッカー</label>
+                    <input type="text" id="list-add-modal-input" placeholder="例: AAPL, 7203.T" autocomplete="off">
+                </div>
+                <button class="btn-primary" onclick="submitListAddFromModal()">リストへ追加</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 詳細ビュー -->
     <main id="detail-view" class="view active">
         <!-- 検索バー -->
@@ -276,8 +293,8 @@
                 <h2>📋 銘柄リスト比較</h2>
                 <div class="list-controls">
                     <div class="list-add-form">
-                        <input type="text" id="list-add-input" placeholder="ティッカーを追加..." autocomplete="off">
-                        <button id="list-add-btn" onclick="addToList()">
+                        <input type="text" id="list-search-input" placeholder="ティッカーを検索（#でタグ）..." autocomplete="off">
+                        <button id="list-add-btn" onclick="openListAddModal()">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                             追加
                         </button>
@@ -289,6 +306,7 @@
                 </div>
             </div>
             <p class="list-description">複数の銘柄を追加して、指標を比較できます。列ヘッダーをクリックすると並び替えできます。</p>
+            <p class="list-search-hint">検索: スペースでAND、|でOR、#テック のようにタグ検索</p>
 
             <!-- アクティブフィルタ表示 -->
             <div class="active-filter-bar hidden" id="active-filter-bar">

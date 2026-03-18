@@ -42,6 +42,7 @@ let pendingDeleteTimer = null;
 
 // タグフィルター
 let activeTagFilter = null;
+let listSearchQuery = '';
 let tagEditSymbol = null;
 
 // ===== Init =====
@@ -873,6 +874,7 @@ async function loadListItemData(symbol, tags) {
                 symbol,
                 loading: false,
                 name: profile.name,
+                country: profile.country,
                 price: price.price,
                 currency: profile.currency,
                 market_cap: profile.market_cap,
@@ -933,18 +935,92 @@ async function editStockMemo(symbol) {
 }
 
 // ===== List View =====
-function quickAddToList(symbol) {
-    document.getElementById('list-add-input').value = symbol;
-    addToList();
+class ListSearchQueryParser {
+    parse(rawQuery) {
+        const normalized = (rawQuery || '').trim();
+        if (!normalized) {
+            return { isEmpty: true, mode: 'AND', tagMode: false, terms: [] };
+        }
+
+        const tagMode = normalized.startsWith('#');
+        const mode = normalized.includes('|') ? 'OR' : 'AND';
+        const splitter = mode === 'OR' ? /\|/ : /\s+/;
+        const terms = normalized
+            .split(splitter)
+            .map(term => term.trim())
+            .filter(Boolean)
+            .map(term => term.replace(/^#/, '').toLowerCase())
+            .filter(Boolean);
+
+        if (terms.length === 0) {
+            return { isEmpty: true, mode, tagMode, terms: [] };
+        }
+
+        return { isEmpty: false, mode, tagMode, terms };
+    }
+
+    matches(item, parsed) {
+        if (parsed.isEmpty) return true;
+
+        const tags = (item.tags || []).map(tag => String(tag).toLowerCase());
+        if (parsed.tagMode) {
+            return parsed.mode === 'OR'
+                ? parsed.terms.some(term => tags.some(tag => tag.includes(term)))
+                : parsed.terms.every(term => tags.some(tag => tag.includes(term)));
+        }
+
+        const searchable = [
+            item.symbol || '',
+            item.name || '',
+            item.country || '',
+            ...(item.tags || []),
+        ]
+            .join(' ')
+            .toLowerCase();
+
+        return parsed.mode === 'OR'
+            ? parsed.terms.some(term => searchable.includes(term))
+            : parsed.terms.every(term => searchable.includes(term));
+    }
 }
 
-async function addToList() {
-    const input = document.getElementById('list-add-input');
+const listSearchParser = new ListSearchQueryParser();
+
+function quickAddToList(symbol) {
+    openListAddModal(symbol);
+}
+
+function openListAddModal(prefill = '') {
+    const modal = document.getElementById('list-add-modal-overlay');
+    const input = document.getElementById('list-add-modal-input');
+    input.value = (prefill || '').toUpperCase();
+    modal.classList.remove('hidden');
+    setTimeout(() => input.focus(), 30);
+}
+
+function closeListAddModal() {
+    document.getElementById('list-add-modal-overlay').classList.add('hidden');
+}
+
+async function submitListAddFromModal() {
+    const input = document.getElementById('list-add-modal-input');
     const symbol = input.value.trim().toUpperCase();
     if (!symbol) return;
-    input.value = '';
 
-    if (listItems.find(item => item.symbol === symbol)) return;
+    const success = await addSymbolToList(symbol);
+    if (success) {
+        input.value = '';
+        closeListAddModal();
+    }
+}
+
+async function addSymbolToList(symbol) {
+    if (!symbol) return false;
+
+    if (listItems.find(item => item.symbol === symbol)) {
+        showToast(`${symbol} は既に追加済みです`, 'info');
+        return false;
+    }
 
     const item = { symbol, loading: true, tags: [] };
     listItems.push(item);
@@ -976,6 +1052,7 @@ async function addToList() {
                 symbol,
                 loading: false,
                 name: profile.name,
+                country: profile.country,
                 price: price.price,
                 currency: profile.currency,
                 market_cap: profile.market_cap,
@@ -985,6 +1062,7 @@ async function addToList() {
                 memo,
             };
             renderListTable();
+            return true;
         }
     } catch (err) {
         listItems = listItems.filter(i => i.symbol !== symbol);
@@ -996,7 +1074,10 @@ async function addToList() {
             } catch { /* ignore */ }
         }
         showToast(`${symbol} の取得に失敗しました`, 'error');
+        return false;
     }
+
+    return false;
 }
 
 async function removeFromList(symbol) {
@@ -1050,8 +1131,13 @@ function sortTable(key) {
 }
 
 function getFilteredItems() {
-    if (!activeTagFilter) return listItems;
-    return listItems.filter(item => item.tags && item.tags.includes(activeTagFilter));
+    const parsed = listSearchParser.parse(listSearchQuery);
+
+    return listItems.filter(item => {
+        const matchesTagFilter = !activeTagFilter || (item.tags && item.tags.includes(activeTagFilter));
+        if (!matchesTagFilter) return false;
+        return listSearchParser.matches(item, parsed);
+    });
 }
 
 function getAllTags() {
@@ -1122,6 +1208,11 @@ function renderListTable() {
     });
 
     const tbody = document.getElementById('comparison-tbody');
+    if (sorted.length === 0) {
+        tbody.innerHTML = '<tr class="row-loading"><td colspan="9" style="color:var(--text-muted)">検索条件に一致する銘柄がありません</td></tr>';
+        return;
+    }
+
     let html = '';
 
     sorted.forEach(item => {
@@ -1541,8 +1632,13 @@ document.getElementById('search-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') searchStock();
 });
 
-document.getElementById('list-add-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addToList();
+document.getElementById('list-search-input').addEventListener('input', e => {
+    listSearchQuery = e.target.value;
+    renderListTable();
+});
+
+document.getElementById('list-add-modal-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitListAddFromModal();
 });
 
 document.getElementById('tag-input').addEventListener('keydown', e => {
