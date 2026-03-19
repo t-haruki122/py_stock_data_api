@@ -247,7 +247,7 @@ class YFinanceClient:
         配当履歴（年間1株配当 + 年利換算の配当利回り）を年次で取得
 
         Returns:
-            {"symbol": str, "history": [{"date": str, "dividend_per_share": float, "dividend_yield": float | None}, ...]}
+            {"symbol": str, "history": [{"date": str, "dividend_per_share": float, "dividend_yield": float | None, "year_end_close": float | None}, ...]}
         """
         try:
             logger.info(
@@ -314,6 +314,7 @@ class YFinanceClient:
                         "date": str(year),
                         "dividend_per_share": round(annual_dividend_per_share, 4),
                         "dividend_yield": annual_dividend_yield,
+                        "year_end_close": round(close_price, 4) if close_price is not None else None,
                     }
                 )
 

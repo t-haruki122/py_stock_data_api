@@ -65,6 +65,7 @@ class DividendHistoryEntry(BaseModel):
     date: str
     dividend_per_share: float | None = None
     dividend_yield: float | None = None
+    year_end_close: float | None = None
 
 
 class DividendHistoryResponse(BaseModel):

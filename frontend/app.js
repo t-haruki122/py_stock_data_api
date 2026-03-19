@@ -680,6 +680,20 @@ function renderDividendHistoryChart(history, currency) {
                             }
                             return `  ${ctx.dataset.label}: ${currencyPrefix}${Number(value).toFixed(4)}`;
                         },
+                        afterBody: tooltipItems => {
+                            const firstItem = tooltipItems && tooltipItems.length > 0 ? tooltipItems[0] : null;
+                            if (!firstItem) return [];
+
+                            const record = records[firstItem.dataIndex];
+                            if (!record || record.year_end_close == null) {
+                                return [' ', '利回り計算株価: —'];
+                            }
+
+                            return [
+                                ' ',
+                                `利回り計算株価(年末終値): ${currencyPrefix}${Number(record.year_end_close).toFixed(2)}`,
+                            ];
+                        },
                     },
                 },
             },
