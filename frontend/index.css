@@ -105,6 +105,19 @@ body {
     letter-spacing: -0.02em;
 }
 
+.logo-home-btn {
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.logo-home-btn:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 4px;
+    border-radius: var(--radius-sm);
+}
+
 .logo-icon {
     font-size: 1.5rem;
 }
@@ -1122,6 +1135,14 @@ footer {
     position: relative;
 }
 
+.account-menu-trigger-icon {
+    opacity: 0.8;
+}
+
+.account-menu-common {
+    border-bottom: 1px solid var(--border-color);
+}
+
 .account-btn.logged-in {
     background: rgba(16, 185, 129, 0.15);
     border-color: var(--accent-emerald);
@@ -1133,6 +1154,8 @@ footer {
     top: calc(100% + 8px);
     right: 0;
     min-width: 200px;
+    display: flex;
+    flex-direction: column;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -1140,6 +1163,14 @@ footer {
     overflow: hidden;
     z-index: 200;
     animation: fadeIn 0.15s ease;
+}
+
+.account-menu.is-logged-in .account-menu-user {
+    order: 1;
+}
+
+.account-menu.is-logged-in .account-menu-common {
+    order: 2;
 }
 
 .account-menu-username {

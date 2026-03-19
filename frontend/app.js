@@ -70,23 +70,18 @@ let tagEditSymbol = null;
 // ===== View Switch =====
 function switchView(view) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(b => {
-        if (b.id === 'btn-detail-view' || b.id === 'btn-list-view' || b.id === 'btn-stats-view') {
-            b.classList.remove('active');
-        }
-    });
+    const listBtn = document.getElementById('btn-list-view');
+    if (listBtn) listBtn.classList.remove('active');
 
     if (view === 'detail') {
         document.getElementById('detail-view').classList.add('active');
-        document.getElementById('btn-detail-view').classList.add('active');
     } else if (view === 'stats') {
         document.getElementById('stats-view').classList.add('active');
-        document.getElementById('btn-stats-view').classList.add('active');
         // If switched to stats view, manually trigger stats fetch to update dashboard
         fetchStats();
     } else {
         document.getElementById('list-view').classList.add('active');
-        document.getElementById('btn-list-view').classList.add('active');
+        if (listBtn) listBtn.classList.add('active');
     }
 }
 
@@ -1619,6 +1614,11 @@ function toggleAccountMenu() {
     }
 }
 
+function openStatsFromAccountMenu() {
+    document.getElementById('account-menu').classList.add('hidden');
+    switchView('stats');
+}
+
 function closeAccountMenuOnOutside(e) {
     const section = document.querySelector('.account-section');
     if (!section.contains(e.target)) {
@@ -1628,6 +1628,7 @@ function closeAccountMenuOnOutside(e) {
 
 function updateAccountUI() {
     const btnLabel = document.getElementById('account-btn-label');
+    const menu = document.getElementById('account-menu');
     const menuUser = document.getElementById('account-menu-user');
     const menuGuest = document.getElementById('account-menu-guest');
     const accountBtn = document.getElementById('account-btn');
@@ -1638,13 +1639,15 @@ function updateAccountUI() {
         menuGuest.classList.add('hidden');
         document.getElementById('account-menu-username').textContent = `👤 ${currentUser.username}`;
         accountBtn.classList.add('logged-in');
+        menu.classList.add('is-logged-in');
     } else {
         btnLabel.textContent = 'ログイン';
         menuUser.classList.add('hidden');
         menuGuest.classList.remove('hidden');
         accountBtn.classList.remove('logged-in');
+        menu.classList.remove('is-logged-in');
     }
-    document.getElementById('account-menu').classList.add('hidden');
+    menu.classList.add('hidden');
 }
 
 // ===== Auth Modal =====
