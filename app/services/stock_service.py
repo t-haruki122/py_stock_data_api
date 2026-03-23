@@ -66,6 +66,51 @@ def _calculate_rsi(closes: list[float], period: int = 14) -> list[float | None]:
     return rsi
 
 
+def _aggregate_history(records: list[dict], interval: str) -> list[dict]:
+    """日次OHLCVを週次/月次OHLCVへ集計する"""
+    if interval not in {"1wk", "1mo"}:
+        return records
+    if not records:
+        return []
+
+    sorted_records = sorted(records, key=lambda x: x["date"])
+    grouped: dict[str, list[dict]] = {}
+
+    for rec in sorted_records:
+        dt = datetime.strptime(rec["date"], "%Y-%m-%d")
+        if interval == "1wk":
+            # 週次は週の開始日(月曜)単位でグルーピング
+            week_start = dt - timedelta(days=dt.weekday())
+            key = week_start.strftime("%Y-%m-%d")
+        else:
+            key = dt.strftime("%Y-%m")
+
+        grouped.setdefault(key, []).append(rec)
+
+    aggregated: list[dict] = []
+    for key in sorted(grouped.keys()):
+        bucket = grouped[key]
+        first = bucket[0]
+        last = bucket[-1]
+
+        highs = [r["high"] for r in bucket if r.get("high") is not None]
+        lows = [r["low"] for r in bucket if r.get("low") is not None]
+        volumes = [r["volume"] for r in bucket if r.get("volume") is not None]
+
+        aggregated.append(
+            {
+                "date": last["date"],
+                "open": first.get("open"),
+                "high": max(highs) if highs else None,
+                "low": min(lows) if lows else None,
+                "close": last["close"],
+                "volume": int(sum(volumes)) if volumes else None,
+            }
+        )
+
+    return aggregated
+
+
 async def get_current_price(symbol: str, db: AsyncSession) -> dict:
     """
     現在の株価を取得（キャッシュ優先）
@@ -119,11 +164,14 @@ async def get_history(
     """
     過去の株価データを取得（キャッシュ優先・指標計算付き）
     """
+    requested_interval = interval.lower()
+    source_interval = "1d" if requested_interval in {"1wk", "1mo"} else requested_interval
+
     # 指標計算用に取得期間を過去へ拡張する
     fetch_start_date = start_date
     if start_date:
         start_dt_req = datetime.strptime(start_date, "%Y-%m-%d")
-        if interval == "1d":
+        if source_interval == "1d":
             fetch_start_dt = start_dt_req - timedelta(days=365)
         else:
             fetch_start_dt = start_dt_req - timedelta(days=365 * 3)
@@ -131,8 +179,8 @@ async def get_history(
 
     records = []
 
-    # 日次データ(1d)のみDBキャッシュを利用する
-    if interval == "1d":
+    # 日次データ(1d)をソースとして使う場合はDBキャッシュを利用する
+    if source_interval == "1d":
         cutoff = datetime.utcnow() - timedelta(seconds=settings.cache_ttl_history)
         stmt = (
             select(StockPrice)
@@ -176,10 +224,10 @@ async def get_history(
     # キャッシュがない場合は外部APIから取得
     if not records:
         stats.log_api_call()
-        records = _client.get_history(symbol, fetch_start_date, end_date, interval)
+        records = _client.get_history(symbol, fetch_start_date, end_date, source_interval)
 
-        # 取得したデータをDBにキャッシュする（日次データのみ）
-        if interval == "1d":
+        # 取得したデータをDBにキャッシュする（日次ソースのみ）
+        if source_interval == "1d":
             # 重複挿入を防ぐため、既存の該当シンボルのキャッシュを削除
             await db.execute(delete(StockPrice).where(StockPrice.symbol == symbol.upper()))
             for rec in records:
@@ -195,6 +243,10 @@ async def get_history(
                 )
                 db.add(db_record)
             await db.commit()
+
+    # 1wk/1moは日次データから再集計する
+    if requested_interval in {"1wk", "1mo"}:
+        records = _aggregate_history(records, requested_interval)
 
     # 指標の計算
     if records:
