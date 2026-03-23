@@ -1,58 +1,25 @@
-# Stock Data API
+# Stock Data Platform
 
-株式分析・為替確認・ウォッチリスト管理をまとめて扱える FastAPI ベースの REST API です。
+株式分析・為替確認・ウォッチリスト管理をまとめて扱える、FastAPI + シンプルなフロントエンドで構成された投資支援アプリです。
 
-## このAPIでできること
+## このプロジェクトの目的
 
-| 分類 | 主な機能 | 主なエンドポイント |
-|---|---|---|
-| 株価 | 現在価格、過去価格の取得 | `GET /stock/{symbol}`、`GET /stock/{symbol}/history` |
-| 企業分析 | 財務情報、企業プロフィール、投資指標の取得 | `GET /stock/{symbol}/financials`、`GET /stock/{symbol}/profile`、`GET /stock/{symbol}/indicators` |
-| ニュース | 銘柄関連ニュースの取得 | `GET /stock/{symbol}/news` |
-| 為替 | 通貨ペアの現在レート取得 | `GET /forex/{pair}` |
-| ユーザー機能 | ユーザー登録/ログイン、銘柄リスト管理、タグ管理 | `POST /user/register`、`POST /user/login`、`/user/{user_id}/lists...` |
-| 運用 | API利用統計の取得 | `GET /stats` |
+このアプリは、以下の目的で作成しています。
 
-## 機能詳細
+- ポートフォリオ管理＆ダッシュボード
+- 投資戦略のバックテスト用ソフトの土台
 
-### 1. 株価・分析データ
+## できること（概要）
 
-- 現在株価: `GET /stock/{symbol}`
-- 過去株価: `GET /stock/{symbol}/history`
-- 財務情報: `GET /stock/{symbol}/financials`
-- 財務履歴: `GET /stock/{symbol}/financials/history`
-- 企業プロフィール: `GET /stock/{symbol}/profile`
-- 投資指標: `GET /stock/{symbol}/indicators`
-- 関連ニュース: `GET /stock/{symbol}/news`
+- 株価・企業情報・財務情報・投資指標・ニュースの取得
+- 為替レートの取得
+- ユーザー登録/ログインとウォッチリスト管理
+- API利用統計の確認
 
-`history` の主なクエリパラメータ:
+## ドキュメント構成
 
-| パラメータ | 説明 | 例 |
-|---|---|---|
-| `start_date` | 開始日 (`YYYY-MM-DD`) | `2025-01-01` |
-| `end_date` | 終了日 (`YYYY-MM-DD`) | `2025-01-31` |
-| `interval` | 取得間隔 | `1d`, `1wk`, `1mo` |
-
-### 2. 為替データ
-
-- 為替レート: `GET /forex/{pair}`
-- 例: `USDJPY` を指定すると内部で `USDJPY=X` に補完されます。
-
-### 3. ユーザー・ウォッチリスト
-
-- ユーザー登録: `POST /user/register`
-- ログイン: `POST /user/login`
-- デフォルトリスト取得: `GET /user/{user_id}/default-list`
-- リスト一覧/作成: `GET/POST /user/{user_id}/lists`
-- リスト詳細/更新/削除: `GET/PUT/DELETE /user/{user_id}/lists/{list_id}`
-- 銘柄追加: `POST /user/{user_id}/lists/{list_id}/items`
-- 銘柄削除: `DELETE /user/{user_id}/lists/{list_id}/items/{symbol}`
-- タグ更新: `PUT /user/{user_id}/lists/{list_id}/items/{symbol}/tags`
-
-### 4. 統計・キャッシュ
-
-- 利用統計: `GET /stats` で API 呼び出し回数やキャッシュヒット情報を取得
-- SQLite を使ったキャッシュで外部APIアクセスを最適化
+- フロントエンド詳細: [docs/FRONTEND.md](docs/FRONTEND.md)
+- バックエンドAPI詳細: [docs/API.md](docs/API.md)
 
 ## セットアップ
 
@@ -64,35 +31,13 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
-## ドキュメントとフロントエンド
+## アクセス先
 
+- アプリ: `http://localhost:8000/`
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
-- ルート (`/`) にアクセスすると `frontend/index.html` を返します（存在する場合）
 
-## フロントエンド構成（ES Modules）
-
-フロントエンドはビルドステップなしのES Modules構成です。`index.html` では `type="module"` で `frontend/app.js` のみを読み込み、各機能モジュールを `import` で連結します。
-
-主な構成:
-
-- エントリポイント: `frontend/app.js`
-- アプリ初期化: `App` クラス（依存注入可能）
-- 共有状態: `frontend/js/state.js`
-- APIヘルパー: `frontend/js/api.js`
-- 共通ユーティリティ: `frontend/js/utils.js`
-- 統計表示: `frontend/js/stats.js`
-- 詳細表示: `frontend/js/detail.js`
-- 価格チャート: `frontend/js/chart.js`
-- 財務チャート: `frontend/js/financial-chart.js`
-- リスト・タグ管理: `frontend/js/list.js`
-- 認証・アカウントUI: `frontend/js/auth.js`
-
-補足:
-
-- HTMLの inline handler（`onclick` / `onchange`）は撤去済みで、モジュール内のイベント登録 (`bind...Events`) に統一しています。
-
-## UIスクリーンショット
+## 画面イメージ
 
 ### 銘柄リスト比較
 ![銘柄リスト比較](docs/images/ScreenShots_2.png)
@@ -102,28 +47,3 @@ python -m uvicorn app.main:app --reload
 
 ### システム統計
 ![システム統計](docs/images/ScreenShots_3.png)
-
-## クイック利用例
-
-```bash
-# 現在株価
-curl http://localhost:8000/stock/AAPL
-
-# 過去株価
-curl "http://localhost:8000/stock/AAPL/history?start_date=2025-01-01&end_date=2025-01-31&interval=1d"
-
-# 会社プロフィール
-curl http://localhost:8000/stock/AAPL/profile
-
-# 財務履歴（年次）
-curl "http://localhost:8000/stock/AAPL/financials/history?limit=8"
-
-# 投資指標
-curl http://localhost:8000/stock/AAPL/indicators
-
-# 為替
-curl http://localhost:8000/forex/USDJPY
-
-# API統計
-curl http://localhost:8000/stats
-```
