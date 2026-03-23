@@ -11,10 +11,11 @@ import argparse
 import csv
 import dataclasses
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 import requests
@@ -53,11 +54,19 @@ class APIClient:
         self.retry_wait = retry_wait
         self.session = requests.Session()
 
-    def _request(self, method: str, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        params: dict[str, Any] | None = None,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         last_error: Exception | None = None
 
         for attempt in range(1, self.max_retries + 1):
+            if cancel_check is not None and cancel_check():
+                raise RuntimeError("Cancelled")
             try:
                 response = self.session.request(
                     method=method,
@@ -76,14 +85,30 @@ class APIClient:
                 return response.json()
             except (requests.Timeout, requests.ConnectionError, RuntimeError) as exc:
                 last_error = exc
+                if str(exc) == "Cancelled":
+                    raise
                 if attempt >= self.max_retries:
                     break
                 sleep_sec = self.retry_wait * attempt
-                time.sleep(sleep_sec)
+                # Sleep in short chunks so cancellation can interrupt retry waits.
+                waited = 0.0
+                while waited < sleep_sec:
+                    if cancel_check is not None and cancel_check():
+                        raise RuntimeError("Cancelled")
+                    chunk = min(0.1, sleep_sec - waited)
+                    time.sleep(chunk)
+                    waited += chunk
 
         raise RuntimeError(f"API request failed after retries: {url} ({last_error})")
 
-    def get_history(self, symbol: str, start_date: str, end_date: str, interval: str) -> dict[str, Any]:
+    def get_history(
+        self,
+        symbol: str,
+        start_date: str,
+        end_date: str,
+        interval: str,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         return self._request(
             "GET",
             f"/stock/{symbol}/history",
@@ -92,20 +117,36 @@ class APIClient:
                 "end_date": end_date,
                 "interval": interval,
             },
+            cancel_check=cancel_check,
         )
 
-    def get_financials(self, symbol: str) -> dict[str, Any]:
-        return self._request("GET", f"/stock/{symbol}/financials")
+    def get_financials(
+        self,
+        symbol: str,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
+        return self._request("GET", f"/stock/{symbol}/financials", cancel_check=cancel_check)
 
-    def get_financial_history(self, symbol: str, limit: int = 6) -> dict[str, Any]:
+    def get_financial_history(
+        self,
+        symbol: str,
+        limit: int = 6,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> dict[str, Any]:
         return self._request(
             "GET",
             f"/stock/{symbol}/financials/history",
             params={"limit": limit},
+            cancel_check=cancel_check,
         )
 
-    def get_watchlist_symbols(self, user_id: int, watchlist_id: int) -> list[str]:
-        payload = self._request("GET", f"/user/{user_id}/lists/{watchlist_id}")
+    def get_watchlist_symbols(
+        self,
+        user_id: int,
+        watchlist_id: int,
+        cancel_check: Callable[[], bool] | None = None,
+    ) -> list[str]:
+        payload = self._request("GET", f"/user/{user_id}/lists/{watchlist_id}", cancel_check=cancel_check)
         items = payload.get("items", [])
         symbols = [str(item.get("symbol", "")).upper() for item in items if item.get("symbol")]
         return sorted(set(symbols))
@@ -169,6 +210,7 @@ class Backtester:
         symbol: str,
         price_df: pd.DataFrame,
         context: dict[str, Any] | None = None,
+        progress_callback: Callable[[int, int, dict[str, Any]], None] | None = None,
     ) -> BacktestResult:
         if context is None:
             context = {}
@@ -184,11 +226,14 @@ class Backtester:
 
         trades: list[dict[str, Any]] = []
         equity_rows: list[dict[str, Any]] = []
+        total_rows = len(df)
+        progress_step = max(1, total_rows // 100)
 
-        for _, row in df.iterrows():
-            date = row["date"]
-            price = float(row["close"])
-            signal = int(row["signal"])
+        for idx, row in enumerate(df.itertuples(index=False), start=1):
+            date = row.date
+            price = float(row.close)
+            signal = int(row.signal)
+            trade_side: str | None = None
 
             if signal == 1 and shares == 0 and price > 0:
                 max_shares = int(cash // (price * (1 + self.fee_rate)))
@@ -210,6 +255,7 @@ class Backtester:
                             "cash_after": round(cash, 4),
                         }
                     )
+                    trade_side = "BUY"
 
             elif signal == -1 and shares > 0:
                 gross = shares * price
@@ -231,6 +277,7 @@ class Backtester:
                 )
                 shares = 0
                 position_cost = 0.0
+                trade_side = "SELL"
 
             holding_value = shares * price
             equity = cash + holding_value
@@ -246,6 +293,28 @@ class Backtester:
                     "signal": signal,
                 }
             )
+
+            if progress_callback is not None:
+                should_emit = (
+                    idx == 1
+                    or idx == total_rows
+                    or idx % progress_step == 0
+                    or trade_side is not None
+                )
+                if should_emit:
+                    progress_callback(
+                        idx,
+                        total_rows,
+                        {
+                            "symbol": symbol,
+                            "date": date,
+                            "signal": signal,
+                            "trade_side": trade_side,
+                            "cash": cash,
+                            "equity": equity,
+                            "price": price,
+                        },
+                    )
 
         equity_df = pd.DataFrame(equity_rows)
         metrics = self._calculate_metrics(symbol, equity_df, trades)
@@ -388,6 +457,21 @@ def plot_result(
 ) -> None:
     import matplotlib.pyplot as plt
 
+    fig = create_result_figure(result)
+    out_path = Path(output_file)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=150)
+    print(f"Chart saved: {out_path}")
+
+    if show_chart:
+        plt.show()
+    else:
+        plt.close(fig)
+
+
+def create_result_figure(result: BacktestResult):
+    import matplotlib.pyplot as plt
+
     eq = result.equity_curve.copy()
     eq["date"] = pd.to_datetime(eq["date"])
 
@@ -411,15 +495,7 @@ def plot_result(
     ax2.legend()
 
     plt.tight_layout()
-    out_path = Path(output_file)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(out_path, dpi=150)
-    print(f"Chart saved: {out_path}")
-
-    if show_chart:
-        plt.show()
-    else:
-        plt.close(fig)
+    return fig
 
 
 def run_single_symbol(
@@ -427,17 +503,37 @@ def run_single_symbol(
     symbol: str,
     args: argparse.Namespace,
     initial_capital: float,
+    cancel_event: threading.Event | None = None,
+    progress_callback: Callable[[float, str], None] | None = None,
 ) -> BacktestResult:
-    history_payload = client.get_history(symbol, args.start_date, args.end_date, args.interval)
+    cancel_check = cancel_event.is_set if cancel_event is not None else None
+
+    def emit_progress(progress: float, message: str) -> None:
+        if progress_callback is not None:
+            progress_callback(progress, message)
+
+    emit_progress(5.0, f"{symbol}: price data fetching")
+    history_payload = client.get_history(
+        symbol,
+        args.start_date,
+        args.end_date,
+        args.interval,
+        cancel_check=cancel_check,
+    )
     history_df = history_to_df(history_payload)
+    emit_progress(20.0, f"{symbol}: price data ready ({len(history_df)} rows)")
 
     context: dict[str, Any] = {}
     if args.max_per is not None:
-        financials = client.get_financials(symbol)
+        emit_progress(25.0, f"{symbol}: financials fetching")
+        financials = client.get_financials(symbol, cancel_check=cancel_check)
         context["pe_ratio"] = financials.get("pe_ratio")
+        emit_progress(30.0, f"{symbol}: financials ready")
+    else:
+        emit_progress(30.0, f"{symbol}: preparing strategy")
 
     if args.fetch_financial_history:
-        fin_hist = client.get_financial_history(symbol, limit=6)
+        fin_hist = client.get_financial_history(symbol, limit=6, cancel_check=cancel_check)
         print(f"Financial history fetched for {symbol}: {len(fin_hist.get('history', []))} rows")
 
     strategy = SmaCrossPerStrategy(
@@ -446,7 +542,26 @@ def run_single_symbol(
         max_per=args.max_per,
     )
     backtester = Backtester(strategy=strategy, initial_capital=initial_capital, fee_rate=args.fee_rate)
-    return backtester.run(symbol=symbol, price_df=history_df, context=context)
+
+    def on_backtest_progress(done: int, total: int, state: dict[str, Any]) -> None:
+        ratio = (done / total) if total > 0 else 1.0
+        overall = 30.0 + ratio * 65.0
+        message = f"{symbol}: {state['date']} processed ({done}/{total})"
+        if state.get("trade_side") is not None:
+            message += (
+                f" | {state['trade_side']} @ {state['price']:.2f}"
+                f" | cash {state['cash']:.2f}"
+            )
+        emit_progress(overall, message)
+
+    result = backtester.run(
+        symbol=symbol,
+        price_df=history_df,
+        context=context,
+        progress_callback=on_backtest_progress,
+    )
+    emit_progress(100.0, f"{symbol}: backtest completed")
+    return result
 
 
 def resolve_symbols(client: APIClient, args: argparse.Namespace) -> list[str]:
